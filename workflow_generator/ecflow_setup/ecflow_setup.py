@@ -362,7 +362,9 @@ class Ecflowsetup:
         """
 
         for item in nodes.keys():
-            if isinstance(nodes[item], dict) and item not in {'edits', 'tasks'}:
+            if isinstance(nodes[item], dict) and item not in {'edits',
+                                                              'tasks',
+                                                              'triggers'}:
                 suite.add_family(item, parents)
                 if parents:
                     family_path = f"{parents}>{item}"
@@ -429,7 +431,7 @@ class Ecflowsetup:
                     family_path = item
                 self.add_tasks_and_edits(suite, nodes[item], family_path)
 
-    def add_triggers_and_events(self, suite, nodes):
+    def add_triggers_and_events(self, suite, nodes, parents=None):
         """
         After the families and tasks are added, then the triggers and events
         are processed. This needs to come after the families and tasks and
@@ -449,7 +451,13 @@ class Ecflowsetup:
         """
 
         for item in nodes.keys():
-            if isinstance(nodes[item], dict) and item == 'tasks':
+            if self.check_dict(nodes[item], 'triggers', False):
+                updated_family = find_env_param(item, 'env.',
+                                                self.env_configs)
+                suite.add_suite_triggers(updated_family,
+                                          nodes[item]['triggers'],
+                                          self.suite_array, parents, 'family')
+            elif isinstance(nodes[item], dict) and item == 'tasks':
                 for task in nodes['tasks'].keys():
                     updated_task = find_env_param(task, 'env.',
                                                   self.env_configs)
@@ -457,11 +465,16 @@ class Ecflowsetup:
                         suite.add_task_events(updated_task,
                                               nodes['tasks'][task]['events'])
                     if self.check_dict(nodes['tasks'][task], 'triggers', False):
-                        suite.add_task_triggers(updated_task,
+                        suite.add_suite_triggers(updated_task,
                                                 nodes['tasks'][task]['triggers'],
-                                                self.suite_array)
+                                                self.suite_array, parents,
+                                                'task')
             elif isinstance(nodes[item], dict):
-                self.add_triggers_and_events(suite, nodes[item])
+                if parents:
+                    family_path = f"{parents}>{item}"
+                else:
+                    family_path = item
+                self.add_triggers_and_events(suite, nodes[item], family_path)
 
 
 def load_ecflow_config(configfile):
