@@ -380,14 +380,12 @@ suites:
               tasks:
                 jenkfgdas_sfc:
                   triggers:
-                  - task: jgdas_atmos_analysis_calc
-                  - task: jenkfgdas_update
-          #forecast:
-            #grp( 1,40 ):
-            #  edits:
-            #    ENSGRP: '( )'
-            #  tasks:
-            #    jenkfgdas_fcst:
+                  - task: [jgdas_atmos_analysis_calc, jenkfgdas_update]
+                    operand: false
+          forecast:
+            triggers:
+            - family: [enkfgdas/analysis/recenter/ecen, enkfgdas/analysis/post]
+            grp1:
           post:
             tasks:
               jenkfgdas_post_f( 3,6 ):
