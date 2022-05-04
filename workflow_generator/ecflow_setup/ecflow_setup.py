@@ -21,7 +21,7 @@ import os
 import re
 import sys
 import datetime
-from ecflow_setup.ecflow_definitions import Ecflowsuite
+from ecflow_setup.ecflow_definitions import Ecflowsuite, ecfFamilyNode
 
 try:
     from ecflow import Defs
@@ -414,17 +414,36 @@ class Ecflowsetup:
             if isinstance(nodes[item], dict) and item not in {'edits',
                                                               'tasks',
                                                               'triggers'}:
-                suite.add_family(item, parents)
-                if parents:
-                    family_path = f"{parents}>{item}"
+                family = ecfFamilyNode(item)
+                if family.is_loop() or family.is_list:
+                    for family_index in family.get_range():
+                        family_name = family.get_full_name(family_index)
+                        suite.add_family(family_name,
+                                         parents)
+                        if parents:
+                            family_path = f"{parents}>{family_name}"
+                        else:
+                            family_path = family_name
+                        if self.check_dict(nodes[item], 'edits'):
+                            suite.add_edit(nodes[item]['edits'], family_path)
+                        if self.check_dict(nodes[item], 'repeat', False):
+                            suite.add_repeat(nodes[item]['repeat'], family_path)
+                        if self.check_dict(nodes[item], 'defstatus', False):
+                            suite.add_defstatus(nodes[item]['defstatus'],
+                                                family_path)
                 else:
-                    family_path = item
-                if self.check_dict(nodes[item], 'edits'):
-                    suite.add_edit(nodes[item]['edits'], family_path)
-                if self.check_dict(nodes[item], 'repeat', False):
-                    suite.add_repeat(nodes[item]['repeat'], family_path)
-                if self.check_dict(nodes[item], 'defstatus', False):
-                    suite.add_defstatus(nodes[item]['defstatus'], family_path)
+                    family_name = family.get_full_name()
+                    suite.add_family(family_name, parents)
+                    if parents:
+                        family_path = f"{parents}>{family_name}"
+                    else:
+                        family_path = family_name
+                    if self.check_dict(nodes[item], 'edits'):
+                        suite.add_edit(nodes[item]['edits'], family_path)
+                    if self.check_dict(nodes[item], 'repeat', False):
+                        suite.add_repeat(nodes[item]['repeat'], family_path)
+                    if self.check_dict(nodes[item], 'defstatus', False):
+                        suite.add_defstatus(nodes[item]['defstatus'], family_path)
                 self.add_families(suite, nodes[item], family_path)
 
     def add_tasks_and_edits(self, suite, nodes, parents=None):
@@ -476,13 +495,25 @@ class Ecflowsetup:
                         suite.add_task_defstatus(updated_task,
                                                  nodes['tasks']
                                                  [task]['defstatus'])
-            elif (isinstance(nodes[item], dict) and
-                  item != 'edits'):
-                if parents:
-                    family_path = f"{parents}>{item}"
+            elif isinstance(nodes[item], dict) and item not in {'edits',
+                                                                'triggers'}:
+                family = ecfFamilyNode(item)
+                if family.is_loop() or family.is_list:
+                    for family_index in family.get_range():
+                        family_name = family.get_full_name(family_index)
+                        if parents:
+                            family_path = f"{parents}>{family_name}"
+                        else:
+                            family_path = family_name
+                        self.add_tasks_and_edits(suite, nodes[item],
+                                                 family_path)
                 else:
-                    family_path = item
-                self.add_tasks_and_edits(suite, nodes[item], family_path)
+                    family_name = family.get_full_name()
+                    if parents:
+                        family_path = f"{parents}>{family_name}"
+                    else:
+                        family_path = family_name
+                    self.add_tasks_and_edits(suite, nodes[item], family_path)
 
     def add_triggers_and_events(self, suite, nodes, parents=None):
         """
