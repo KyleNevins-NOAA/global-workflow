@@ -55,9 +55,13 @@ class Ecflowsuite:
 
     Attributes
     ----------
-    ecfnodes : dict
+    ecfsuite_nodes : dict
         Dictionary object that contains all the nodes within the suite. This
         includes tasks, families, triggers, events, etc.
+    ecf_nodes : dict
+        While the ecfsuite_nodes dictionary tracks the actual ecflow API
+        defined nodes, this dictionary tracks the custom nodes that are
+        defined in the bottom of this module.
     ecfhome : str
         The path to the base for the ecf items. This includes the ecf scripts
         repository and the storage location for all the suite script. In the
@@ -169,7 +173,8 @@ class Ecflowsuite:
         """
 
         # Initialize environment
-        self.ecfnodes = {}
+        self.ecfsuite_nodes = {}
+        self.ecf_nodes = {}
         self.ecfhome = ecfhome
         self.build_tree = build_tree
 
@@ -941,7 +946,7 @@ class ecfNode():
     get_name()
         Returns the name of the node.
 
-    is_loop()
+    check_loop()
         Checks to see if the ecfNode is a loop. If it is, this function also
         calls the supporting functions to set the range values, if there is
         a max, min, interval, or list.
@@ -979,41 +984,20 @@ class ecfNode():
         range of items or the range of the array.
     """
 
-    def __init__(self, ecfItem):
+    def __init__(self, ecfitem, ecfparent=None):
         """
         Parameters
         ----------
-        ecfItem : str
+        ecfitem : str
             Name of the ecfNode item. If it contains a range or list
             identifier, the other values are populated to identify what kind
             of node it is.
+        ecfparent : str
+            Name of the parent for the ecfNode item. This will help determine
+            if the parent has the counter or if one is defined for this class
         """
 
-        if isinstance(ecfItem, str):
-            if re.search(r".*\(.*\).*", ecfItem):
-                self.initial_count = None
-                self.increment = None
-                self.name = ecfItem
-                self.is_list = False
-            elif re.search(r".*\[.*\].*", ecfItem):
-                self.initial_count = None
-                self.increment = None
-                self.name = ecfItem
-                self.is_list = True
-                self.use_parent_counter = False
-                self.items = re.search(".*\[(.*)\].*",self.name).group(1).strip().split(',')
-            else:
-                self.name = ecfItem
-                self.is_list = False
-        elif isinstance(ecfItem, list):
-            self.initial_count = None
-            self.increment = None
-            self.name = ''
-            self.is_list = True
-            self.items = ecfItem
-        else:
-            self.name = ecfItem
-            self.is_list = False
+        self.__check_range(ecfitem, ecfparent)
 
     def get_name(self):
         """
@@ -1031,7 +1015,7 @@ class ecfNode():
 
         return self.name
 
-    def is_loop(self):
+    def __check_range(self, ecfitem, ecfparent):
         """
         Checks to see if the ecfNode is a loop. If it is, this function also
         calls the supporting functions to set the range values, if there is
@@ -1049,15 +1033,40 @@ class ecfNode():
             True if the node is a loop format defined by ( ).
         """
 
-        range_functions = {
-            1: self.set_max_value,
-            2: self.set_initial_max_value,
-            3: self.set_initial_increment_max_value,
-        }
+        if isinstance(ecfitem, str):
+            if re.search(r".*\(.*\).*", ecfitem):
+                self.name = ecfitem
+                self.is_list = False
+                range_functions = {
+                    1: self.set_max_value,
+                    2: self.set_initial_max_value,
+                    3: self.set_initial_increment_max_value,
+                }
+                self.use_parent_counter = False
+                range_token = re.search(".*\((.*)\).*", self.name).group(
+                    1).strip().split(',')
+                range_functions.get(len(range_token),
+                                    self.invalid_range)(range_token)
+            elif re.search(r".*\[.*\].*", ecfItem):
+                self.name = ecfitem
+                self.is_list = True
+                self.use_parent_counter = False
+                self.items = re.search(".*\[(.*)\].*",
+                                       ecfitem).group(1).strip().split(',')
+            else:
+                self.name = ecfitem
+                self.is_list = False
+        elif isinstance(ecfItem, list):
+            self.name = ''.join(str(i) for i in ecfitem)
+            self.is_list = True
+            self.items = ecfitem
+        else:
+            self.name = ecfitem
+            self.is_list = False
+
+
         if not self.is_list and re.search(r".*\(.*\).*", self.name):
-            self.use_parent_counter = False
-            range_token = re.search(".*\((.*)\).*", self.name).group(1).strip().split(',')
-            range_functions.get(len(range_token), self.invalid_range)(range_token)
+
             return True
         else:
             return False
@@ -1246,6 +1255,9 @@ class ecfNode():
         """
 
         return self.max_value
+
+    def get_loop_objects(self):
+
 
     def get_range(self, initial_count=0, increment=1, max_value=1):
         """
